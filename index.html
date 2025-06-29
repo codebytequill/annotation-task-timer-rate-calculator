@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annotation Task Timer & Rate Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #718096;
+        }
+        .timer-display {
+            font-feature-settings: 'tnum'; /* Tabular nums for non-shifting timer */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-white">Annotation Task Timer & Rate Calculator</h1>
+            <p class="mt-2 text-gray-400">Track your time, understand your value, and calculate fair per-task rates.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left Column: Setup & Timer -->
+            <div class="lg:col-span-1 space-y-6">
+                <!-- Project & Rate Setup -->
+                <section class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">1. Setup</h2>
+                    <div>
+                        <label for="targetRate" class="block text-sm font-medium text-gray-300 mb-1">Your Target Hourly Rate ($)</label>
+                        <input type="number" id="targetRate" class="w-full bg-gray-700 border-gray-600 text-white rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., 25">
+                    </div>
+                </section>
+                
+                <!-- Task Categories -->
+                <section class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">2. Task Categories</h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="newCategoryName" class="flex-grow bg-gray-700 border-gray-600 text-white rounded-md p-2" placeholder="e.g., Complex Segmentation">
+                        <button id="addCategoryBtn" class="bg-teal-600 hover:bg-teal-500 text-white font-bold p-2 rounded-md transition">+</button>
+                    </div>
+                    <div id="categoryList" class="mt-4 space-y-2">
+                        <!-- Dynamic categories will be added here -->
+                    </div>
+                </section>
+
+                <!-- Timer -->
+                <section class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">3. Timer</h2>
+                     <div>
+                        <label for="activeCategorySelect" class="block text-sm font-medium text-gray-300 mb-1">Select Category to Time</label>
+                        <select id="activeCategorySelect" class="w-full bg-gray-700 border-gray-600 text-white rounded-md p-2 mb-4"></select>
+                    </div>
+                    <div class="text-center bg-gray-900 p-4 rounded-lg">
+                        <p id="timerDisplay" class="text-5xl font-bold timer-display text-white">00:00:00</p>
+                        <p id="activeCategoryDisplay" class="text-teal-400 h-5 mt-1 text-sm">&nbsp;</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <button id="startTimerBtn" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-4 rounded-md transition">Start</button>
+                        <button id="stopTimerBtn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-4 rounded-md transition" disabled>Stop</button>
+                    </div>
+                    <button id="logTaskBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-md transition mt-4" disabled>Log Task & Reset</button>
+                </section>
+            </div>
+
+            <!-- Right Column: Analysis -->
+            <div class="lg:col-span-2">
+                <section class="bg-gray-800 p-6 rounded-xl shadow-lg h-full">
+                    <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">4. Analysis & Results</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="border-b border-gray-700 text-sm text-gray-400">
+                                    <th class="py-2">Category</th>
+                                    <th class="py-2 text-center">Tasks Logged</th>
+                                    <th class="py-2 text-center">Avg. Time/Task</th>
+                                    <th class="py-2 text-right">Fair Rate/Task</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analysisTableBody">
+                                <!-- Dynamic analysis rows will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                     <button id="resetAllBtn" class="mt-6 bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-md transition">Reset All Data</button>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE MANAGEMENT ---
+            let state = {
+                targetRate: 25,
+                categories: {},
+                timer: {
+                    startTime: null,
+                    intervalId: null,
+                    elapsedSeconds: 0,
+                    isRunning: false,
+                    activeCategory: null
+                }
+            };
+
+            // --- DOM ELEMENTS ---
+            const targetRateInput = document.getElementById('targetRate');
+            const newCategoryNameInput = document.getElementById('newCategoryName');
+            const addCategoryBtn = document.getElementById('addCategoryBtn');
+            const categoryListDiv = document.getElementById('categoryList');
+            const activeCategorySelect = document.getElementById('activeCategorySelect');
+            const timerDisplay = document.getElementById('timerDisplay');
+            const activeCategoryDisplay = document.getElementById('activeCategoryDisplay');
+            const startTimerBtn = document.getElementById('startTimerBtn');
+            const stopTimerBtn = document.getElementById('stopTimerBtn');
+            const logTaskBtn = document.getElementById('logTaskBtn');
+            const analysisTableBody = document.getElementById('analysisTableBody');
+            const resetAllBtn = document.getElementById('resetAllBtn');
+
+            // --- UTILITY FUNCTIONS ---
+            const formatTime = (totalSeconds) => {
+                const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+                const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+                const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+                return `${hours}:${minutes}:${seconds}`;
+            };
+
+            const formatCurrency = (amount) => {
+                return `$${amount.toFixed(4)}`;
+            };
+
+            // --- STATE & UI SYNC FUNCTIONS ---
+            const saveState = () => localStorage.setItem('annotationTimerState', JSON.stringify(state));
+            
+            const loadState = () => {
+                const savedState = localStorage.getItem('annotationTimerState');
+                if (savedState) {
+                    state = JSON.parse(savedState);
+                    // Ensure loaded state has all properties
+                    state.timer = state.timer || { isRunning: false, elapsedSeconds: 0 };
+                }
+            };
+            
+            const render = () => {
+                // Update UI from state
+                targetRateInput.value = state.targetRate;
+                renderCategories();
+                renderAnalysis();
+                updateTimerUI();
+            };
+
+            const renderCategories = () => {
+                categoryListDiv.innerHTML = '';
+                activeCategorySelect.innerHTML = '';
+
+                if (Object.keys(state.categories).length === 0) {
+                    categoryListDiv.innerHTML = '<p class="text-gray-500 text-center italic">No categories yet.</p>';
+                    activeCategorySelect.innerHTML = '<option disabled>Add a category first</option>';
+                    return;
+                }
+
+                Object.keys(state.categories).forEach(name => {
+                    // Render category list with remove button
+                    const catEl = document.createElement('div');
+                    catEl.className = 'bg-gray-700/50 p-2 rounded-md flex justify-between items-center';
+                    catEl.innerHTML = `
+                        <span class="text-white">${name}</span>
+                        <button data-name="${name}" class="remove-cat-btn text-red-500 hover:text-red-400 font-bold text-lg leading-none">&times;</button>
+                    `;
+                    categoryListDiv.appendChild(catEl);
+
+                    // Populate dropdown
+                    const optionEl = document.createElement('option');
+                    optionEl.value = name;
+                    optionEl.textContent = name;
+                    activeCategorySelect.appendChild(optionEl);
+                });
+                
+                activeCategorySelect.value = state.timer.activeCategory || Object.keys(state.categories)[0];
+                state.timer.activeCategory = activeCategorySelect.value;
+            };
+
+            const renderAnalysis = () => {
+                analysisTableBody.innerHTML = '';
+                if (Object.keys(state.categories).length === 0) {
+                     analysisTableBody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-4">No data to analyze.</td></tr>';
+                     return;
+                }
+                
+                Object.entries(state.categories).forEach(([name, data]) => {
+                    const avgTime = data.tasks > 0 ? data.totalTime / data.tasks : 0;
+                    const fairRate = data.tasks > 0 ? (avgTime / 3600) * state.targetRate : 0;
+                    
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-gray-700/50';
+                    row.innerHTML = `
+                        <td class="py-3 font-semibold">${name}</td>
+                        <td class="py-3 text-center">${data.tasks}</td>
+                        <td class="py-3 text-center">${formatTime(Math.round(avgTime))}</td>
+                        <td class="py-3 text-right font-mono text-teal-300">${formatCurrency(fairRate)}</td>
+                    `;
+                    analysisTableBody.appendChild(row);
+                });
+            };
+
+            const updateTimerUI = () => {
+                timerDisplay.textContent = formatTime(state.timer.elapsedSeconds);
+                if (state.timer.isRunning) {
+                    startTimerBtn.disabled = true;
+                    stopTimerBtn.disabled = false;
+                    logTaskBtn.disabled = true;
+                    activeCategorySelect.disabled = true;
+                    activeCategoryDisplay.textContent = `Timing: ${state.timer.activeCategory}`;
+                } else {
+                    startTimerBtn.disabled = false;
+                    stopTimerBtn.disabled = true;
+                    logTaskBtn.disabled = state.timer.elapsedSeconds === 0;
+                    activeCategorySelect.disabled = false;
+                     activeCategoryDisplay.textContent = '\u00A0'; // non-breaking space
+                }
+            };
+            
+            // --- EVENT HANDLERS & LOGIC ---
+
+            const handleAddCategory = () => {
+                const name = newCategoryNameInput.value.trim();
+                if (name && !state.categories[name]) {
+                    state.categories[name] = { tasks: 0, totalTime: 0 };
+                    newCategoryNameInput.value = '';
+                    render();
+                    saveState();
+                }
+            };
+
+            const handleRemoveCategory = (name) => {
+                 if (confirm(`Are you sure you want to remove category "${name}" and all its data?`)) {
+                    delete state.categories[name];
+                    if (state.timer.activeCategory === name) {
+                        state.timer.activeCategory = null;
+                    }
+                    render();
+                    saveState();
+                 }
+            };
+            
+            const handleStartTimer = () => {
+                if (state.timer.isRunning || !state.timer.activeCategory) return;
+                state.timer.isRunning = true;
+                state.timer.startTime = Date.now() - state.timer.elapsedSeconds * 1000;
+                state.timer.intervalId = setInterval(() => {
+                    state.timer.elapsedSeconds = Math.round((Date.now() - state.timer.startTime) / 1000);
+                    updateTimerUI();
+                }, 1000);
+                updateTimerUI();
+            };
+            
+            const handleStopTimer = () => {
+                if (!state.timer.isRunning) return;
+                state.timer.isRunning = false;
+                clearInterval(state.timer.intervalId);
+                state.timer.intervalId = null;
+                updateTimerUI();
+                saveState(); // Save progress when stopped
+            };
+
+            const handleLogTask = () => {
+                if (state.timer.elapsedSeconds === 0 || !state.timer.activeCategory) return;
+                
+                const categoryData = state.categories[state.timer.activeCategory];
+                categoryData.tasks++;
+                categoryData.totalTime += state.timer.elapsedSeconds;
+                
+                // Reset timer
+                state.timer.elapsedSeconds = 0;
+                state.timer.startTime = null;
+                
+                renderAnalysis();
+                updateTimerUI();
+                saveState();
+            };
+
+            const handleResetAll = () => {
+                if (confirm('Are you sure you want to reset ALL categories and data? This cannot be undone.')) {
+                    state.targetRate = 25;
+                    state.categories = {};
+                    handleStopTimer();
+                    state.timer.elapsedSeconds = 0;
+                    state.timer.activeCategory = null;
+                    render();
+                    saveState();
+                }
+            };
+
+
+            // --- ATTACH EVENT LISTENERS ---
+            targetRateInput.addEventListener('change', (e) => {
+                state.targetRate = parseFloat(e.target.value) || 0;
+                renderAnalysis();
+                saveState();
+            });
+
+            addCategoryBtn.addEventListener('click', handleAddCategory);
+            newCategoryNameInput.addEventListener('keypress', (e) => {
+                if(e.key === 'Enter') handleAddCategory();
+            });
+            
+            categoryListDiv.addEventListener('click', (e) => {
+                if (e.target.classList.contains('remove-cat-btn')) {
+                    handleRemoveCategory(e.target.dataset.name);
+                }
+            });
+
+            activeCategorySelect.addEventListener('change', (e) => {
+                state.timer.activeCategory = e.target.value;
+            });
+            
+            startTimerBtn.addEventListener('click', handleStartTimer);
+            stopTimerBtn.addEventListener('click', handleStopTimer);
+            logTaskBtn.addEventListener('click', handleLogTask);
+            resetAllBtn.addEventListener('click', handleResetAll);
+
+            // --- INITIALIZATION ---
+            loadState();
+            render();
+        });
+    </script>
+</body>
+</html>
